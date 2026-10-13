@@ -18,6 +18,7 @@ A tax analyst or audit team member wants to record details of communications tie
 - Global exception handling
 - H2 in-memory database for local running and demos
 - Unit and controller tests
+- JWT-based authentication (demo user)
 
 ## Technology Stack
 
@@ -29,6 +30,7 @@ A tax analyst or audit team member wants to record details of communications tie
 - H2 in-memory database
 - Maven
 - JUnit 5 + Mockito
+- Spring Security + JWT
 
 ## Application Flow
 
@@ -52,6 +54,7 @@ src/
       AuditCommunicationsLogApplication.java
       controller/
         CommunicationLogController.java
+        AuthController.java
       service/
         CommunicationLogService.java
       repository/
@@ -61,9 +64,16 @@ src/
       dto/
         CommunicationLogRequest.java
         CommunicationLogResponse.java
+        AuthRequest.java
+        AuthResponse.java
       exception/
         ApiError.java
         GlobalExceptionHandler.java
+      security/
+        SecurityConfig.java
+        JwtTokenUtil.java
+        JwtAuthenticationFilter.java
+        DemoUserDetailsService.java
     resources/
       application.properties
   test/
@@ -74,6 +84,39 @@ src/
         CommunicationLogServiceTest.java
 ```
 
+## Authentication (JWT)
+
+This demo uses JWT for authentication. There is a demo user hard-coded in the application:
+
+- username: `demo`
+- password: `demo-password`
+
+Login endpoint:
+
+```http
+POST /api/auth/login
+Content-Type: application/json
+
+{
+  "username": "demo",
+  "password": "demo-password"
+}
+```
+
+Response:
+
+```json
+{ "token": "<JWT_TOKEN>" }
+```
+
+Use the token to access protected endpoints by adding the Authorization header:
+
+```
+Authorization: Bearer <JWT_TOKEN>
+```
+
+The login endpoint and h2 console are left public; all other endpoints require a valid token.
+
 ## Endpoints
 
 ### Create communication log
@@ -83,6 +126,7 @@ Endpoint:
 ```http
 POST /api/communication-logs
 Content-Type: application/json
+Authorization: Bearer <JWT_TOKEN>
 ```
 
 Example request body:
@@ -96,40 +140,13 @@ Example request body:
 }
 ```
 
-Example response:
-
-```json
-{
-  "id": 1,
-  "auditId": "AUD-1001",
-  "interactionType": "EMAIL",
-  "notes": "Follow-up email sent to client regarding evidence request.",
-  "interactionDate": "2026-10-12",
-  "createdAt": "2026-10-12T09:15:30"
-}
-```
-
 ### Get logs by audit ID
 
 Endpoint:
 
 ```http
 GET /api/communication-logs?auditId=AUD-1001
-```
-
-Example response:
-
-```json
-[
-  {
-    "id": 1,
-    "auditId": "AUD-1001",
-    "interactionType": "EMAIL",
-    "notes": "Follow-up email sent to client regarding evidence request.",
-    "interactionDate": "2026-10-12",
-    "createdAt": "2026-10-12T09:15:30"
-  }
-]
+Authorization: Bearer <JWT_TOKEN>
 ```
 
 ### Get log by ID
@@ -138,6 +155,7 @@ Endpoint:
 
 ```http
 GET /api/communication-logs/{id}
+Authorization: Bearer <JWT_TOKEN>
 ```
 
 ## Validation Rules
@@ -165,20 +183,6 @@ The application returns consistent JSON error payloads for:
 - bad requests
 - missing records
 - unexpected server errors
-
-Example error response:
-
-```json
-{
-  "timestamp": "2026-10-12T09:20:10",
-  "status": 400,
-  "error": "Bad Request",
-  "message": "Validation failed",
-  "details": [
-    "interactionDate: Interaction date cannot be in the future"
-  ]
-}
-```
 
 ## Run the Project
 
@@ -237,28 +241,22 @@ This includes:
 - service tests using Mockito
 - validation and business-rule checks
 
-## Why This Project Is Good for Interviews
-
-This project is intentionally small but covers several important backend development concepts:
-
-- REST API design
-- Dependency injection
-- Service-layer architecture
-- Validation and business logic
-- Hibernate/JPA persistence
-- Data transfer objects
-- Exception handling
-- Automated testing
-
-It is easy to explain, easy to demo, and easy to extend if the interviewer asks follow-up questions.
-
 ## Example curl Commands
 
-### Create a log
+### Login and get a token
+
+```bash
+curl -X POST http://localhost:8080/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"demo","password":"demo-password"}'
+```
+
+### Create a log (use token returned from login)
 
 ```bash
 curl -X POST http://localhost:8080/api/communication-logs \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <JWT_TOKEN>" \
   -d '{
     "auditId": "AUD-1001",
     "interactionType": "EMAIL",
@@ -270,27 +268,17 @@ curl -X POST http://localhost:8080/api/communication-logs \
 ### Get logs by audit ID
 
 ```bash
-curl "http://localhost:8080/api/communication-logs?auditId=AUD-1001"
-```
-
-### Get a single log by ID
-
-```bash
-curl http://localhost:8080/api/communication-logs/1
+curl "http://localhost:8080/api/communication-logs?auditId=AUD-1001" -H "Authorization: Bearer <JWT_TOKEN>"
 ```
 
 ## Future Enhancements
 
-This is a solid base for a production-grade application. Possible next improvements include:
-
-- MySQL or PostgreSQL instead of H2
-- User authentication and authorization
-- Pagination and filtering
-- Audit trail/history tracking
-- Docker support
-- Flyway/Liquibase database migrations
-- Swagger/OpenAPI documentation
+- Refresh tokens and token revocation
+- User persistence instead of hard-coded demo user
+- Role-based authorization (admin vs user)
+- DB migrations (Flyway/Liquibase)
+- Docker + Kubernetes deployment
 
 ## Summary
 
-This project demonstrates a clean, practical backend implementation for an audit communications log feature using Java, Spring Boot, Spring MVC, and Hibernate. It is small enough to explain quickly, but comprehensive enough to showcase real engineering principles.
+This project demonstrates a small, production-oriented backend with JWT-based authentication to secure the API. It's easy to run locally and extend for production scenarios.
