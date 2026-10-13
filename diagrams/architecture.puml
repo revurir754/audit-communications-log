@@ -1,0 +1,41 @@
+@startuml
+actor Client
+package "API Layer" {
+  rectangle "CommunicationLogController\n(Controller)" as Controller
+  rectangle "CommunicationLogRequest\n(DTO Validation)" as Validator
+  rectangle "CommunicationLogResponse\n(Response DTO)" as ResponseDTO
+}
+package "Service Layer" {
+  rectangle "CommunicationLogService\n(Business rules & @Transactional)" as Service
+  rectangle "Business Validation\n(e.g., date not future)" as BusinessRules
+}
+package "Persistence Layer" {
+  rectangle "CommunicationLogRepository\n(Spring Data JPA)" as Repository
+  rectangle "CommunicationLog (Entity)\nJPA/Hibernate mapping" as Entity
+  database "H2 / RDBMS" as DB
+}
+package "Cross-cutting" {
+  rectangle "GlobalExceptionHandler\n(centralized errors)" as GlobalHandler
+}
+package "Tests" {
+  rectangle "CommunicationLogControllerTest\n(MockMvc)" as CTest
+  rectangle "CommunicationLogServiceTest\n(Mockito)" as STest
+}
+
+Client --> Controller : POST / GET
+Controller --> Validator : @Valid
+Controller --> Service : delegate
+Service --> BusinessRules : validate business rules
+Service --> Repository : save / find
+Repository --> Entity : map
+Repository --> DB : SQL / persist
+Service --> ResponseDTO : map to response
+Controller --> Client : return JSON
+
+Controller --> GlobalHandler : exceptions
+Service --> GlobalHandler : exceptions
+Repository --> GlobalHandler : exceptions
+
+CTest --> Controller : mocks Service
+STest --> Service : mocks Repository
+@enduml
